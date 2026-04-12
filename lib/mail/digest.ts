@@ -1,8 +1,10 @@
 import { Resend } from "resend";
 
 import { getEnv } from "@/lib/env";
+import { Platform } from "@prisma/client";
 
 type DigestVideo = {
+  platform: Platform;
   creatorName: string;
   title: string;
   url: string;
@@ -13,14 +15,16 @@ function renderDigestHtml(videos: DigestVideo[]) {
   const items = videos
     .sort((a, b) => b.publishedAt.getTime() - a.publishedAt.getTime())
     .map(
-      (video) =>
-        `<li style="margin-bottom:10px;"><strong>${video.creatorName}</strong> · <a href="${video.url}">${video.title}</a> <span style="color:#666;">(${video.publishedAt.toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" })})</span></li>`,
+      (video) => {
+        const platformBadge = video.platform === "bilibili" ? "[B站]" : "[YT]";
+        return `<li style="margin-bottom:10px;"><strong>${video.creatorName}</strong> <span style="color:#888;">${platformBadge}</span> · <a href="${video.url}">${video.title}</a> <span style="color:#666;">(${video.publishedAt.toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" })})</span></li>`;
+      },
     )
     .join("");
 
   return `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 720px; margin: 0 auto; color: #111;">
-      <h2>Bilibili 每日摘要</h2>
+      <h2>视频每日摘要</h2>
       <p>过去 24 小时更新如下：</p>
       <ul style="padding-left: 20px;">
         ${items}
@@ -39,7 +43,7 @@ export async function sendDigestEmail(to: string, videos: DigestVideo[]) {
   await resend.emails.send({
     from: env.MAIL_FROM,
     to,
-    subject: `Bilibili 摘要 ${new Date().toLocaleDateString("zh-CN", { timeZone: "Asia/Shanghai" })}`,
+    subject: `视频摘要 ${new Date().toLocaleDateString("zh-CN", { timeZone: "Asia/Shanghai" })}`,
     html: renderDigestHtml(videos),
   });
 }

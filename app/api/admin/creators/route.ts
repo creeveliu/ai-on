@@ -2,25 +2,9 @@ import { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 
 import { getAdminSession } from "@/lib/auth";
-import { fetchCreatorLatestVideos, fetchCreatorProfile } from "@/lib/bili";
 import { db } from "@/lib/db";
 import { redirectTo } from "@/lib/http";
-
-function parseMid(value: string): string | null {
-  const input = value.trim();
-  if (!input) return null;
-  if (/^\d+$/.test(input)) return input;
-
-  // Supports links like:
-  // https://space.bilibili.com/12345
-  // https://m.bilibili.com/space/12345
-  const match = input.match(/(?:space\.bilibili\.com\/|\/space\/)(\d+)/i);
-  if (match?.[1]) return match[1];
-
-  // Last fallback: extract a number sequence from pasted content.
-  const loose = input.match(/(\d{3,})/);
-  return loose?.[1] ?? null;
-}
+import { detectPlatformFromUrl, getPlatformClient } from "@/lib/platform";
 
 export async function POST(req: NextRequest) {
   const session = await getAdminSession();
@@ -29,40 +13,77 @@ export async function POST(req: NextRequest) {
   }
 
   const formData = await req.formData();
-  const mid = parseMid(String(formData.get("link") ?? formData.get("mid") ?? ""));
+  const link = String(formData.get("link") ?? "").trim();
 
-  if (!mid) {
+  if (!link) {
     return redirectTo(req, "/admin/creators?error=invalid");
   }
 
+  // Detect platform from URL
+  const platform = detectPlatformFromUrl(link);
+  if (!platform) {
+    return redirectTo(req, "/admin/creators?error=unknown_platform");
+  }
+
+  const client = getPlatformClient(platform);
+  const platformId = client.parsePlatformId(link);
+
+  if (!platformId) {
+    return redirectTo(req, "/admin/creators?error=invalid_id");
+  }
+
+  // Resolve to actual platform ID if needed (for YouTube handles)
+  let resolvedPlatformId = platformId;
+  if (platform === "youtube" && !/^UC[A-Za-z0-9_-]{22}$/.test(platformId)) {
+    // Import resolveChannelId dynamically to handle resolution
+    const { resolveChannelId } = await import("@/lib/youtube");
+    const resolved = await resolveChannelId(platformId);
+    if (!resolved) {
+      return redirectTo(req, "/admin/creators?error=resolve_failed");
+    }
+    resolvedPlatformId = resolved;
+  }
+
+  // Fetch profile
   let finalName: string;
   let avatarUrl: string | null = null;
   try {
-    const profile = await fetchCreatorProfile(mid);
-    finalName = profile.name ?? `up_${mid}`;
+    const profile = await client.fetchProfile(resolvedPlatformId);
+    finalName = profile.name ?? `${platform}_${resolvedPlatformId}`;
     avatarUrl = profile.avatarUrl;
   } catch {
-    finalName = `up_${mid}`;
+    finalName = `${platform}_${resolvedPlatformId}`;
   }
 
+  // Upsert creator with composite key
   const creator = await db.creator.upsert({
-    where: { mid },
+    where: {
+      platform_platformId: {
+        platform,
+        platformId: resolvedPlatformId,
+      },
+    },
     update: { name: finalName, avatarUrl, enabled: true },
     create: {
       name: finalName,
-      mid,
+      platform,
+      platformId: resolvedPlatformId,
       avatarUrl,
       enabled: true,
-      platform: "bilibili",
     },
   });
 
-  // Auto-fetch this creator right after adding/updating.
+  // Auto-fetch videos
   try {
-    const videos = await fetchCreatorLatestVideos(mid);
+    const videos = await client.fetchLatestVideos(resolvedPlatformId);
     for (const item of videos) {
       await db.video.upsert({
-        where: { bvid: item.bvid },
+        where: {
+          platform_videoId: {
+            platform,
+            videoId: item.videoId,
+          },
+        },
         update: {
           title: item.title,
           url: item.url,
@@ -71,7 +92,8 @@ export async function POST(req: NextRequest) {
           creatorId: creator.id,
         },
         create: {
-          bvid: item.bvid,
+          platform,
+          videoId: item.videoId,
           title: item.title,
           url: item.url,
           publishedAt: item.publishedAt,

@@ -67,6 +67,7 @@ export async function runSendDigestJob() {
       await sendDigestEmail(
         subscriber.email,
         videos.map((video) => ({
+          platform: video.platform,
           creatorName: video.creator.name,
           title: video.title,
           url: video.url,

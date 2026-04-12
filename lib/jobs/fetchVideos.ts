@@ -1,7 +1,7 @@
-import { JobStatus } from "@prisma/client";
+import { JobStatus, Platform } from "@prisma/client";
 
-import { fetchCreatorLatestVideos, fetchCreatorProfile } from "@/lib/bili";
 import { db } from "@/lib/db";
+import { getPlatformClient } from "@/lib/platform";
 
 export async function runFetchVideosJob() {
   const creators = await db.creator.findMany({ where: { enabled: true } });
@@ -9,21 +9,28 @@ export async function runFetchVideosJob() {
   let successCount = 0;
   let failedCount = 0;
   let upsertedCount = 0;
-  const failures: Array<{ mid: string; reason: string }> = [];
+  const failures: Array<{ platformId: string; platform: Platform; reason: string }> = [];
 
   for (const creator of creators) {
+    const client = getPlatformClient(creator.platform);
+
     let profileName: string | null = null;
     let profileAvatarUrl: string | null = null;
 
     try {
-      const profile = await fetchCreatorProfile(creator.mid);
+      const profile = await client.fetchProfile(creator.platformId);
       profileName = profile.name;
       profileAvatarUrl = profile.avatarUrl;
-      const videos = await fetchCreatorLatestVideos(creator.mid);
+      const videos = await client.fetchLatestVideos(creator.platformId);
 
       for (const item of videos) {
         await db.video.upsert({
-          where: { bvid: item.bvid },
+          where: {
+            platform_videoId: {
+              platform: creator.platform,
+              videoId: item.videoId,
+            },
+          },
           update: {
             title: item.title,
             url: item.url,
@@ -32,7 +39,8 @@ export async function runFetchVideosJob() {
             creatorId: creator.id,
           },
           create: {
-            bvid: item.bvid,
+            platform: creator.platform,
+            videoId: item.videoId,
             title: item.title,
             url: item.url,
             publishedAt: item.publishedAt,
@@ -66,7 +74,8 @@ export async function runFetchVideosJob() {
 
       failedCount += 1;
       failures.push({
-        mid: creator.mid,
+        platform: creator.platform,
+        platformId: creator.platformId,
         reason: error instanceof Error ? error.message : "Unknown error",
       });
     }

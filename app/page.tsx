@@ -1,9 +1,50 @@
+import { Platform } from "@prisma/client";
 import Link from "next/link";
 
 import { db } from "@/lib/db";
 import { isDbReachabilityError } from "@/lib/prisma-error";
 
 import { SubscribePopover } from "./subscribe-popover";
+
+type VideoWithCreator = {
+  id: string;
+  platform: Platform;
+  title: string;
+  url: string;
+  publishedAt: Date;
+  raw: unknown;
+  creator: { name: string; avatarUrl: string | null };
+};
+
+function extractCoverUrl(video: VideoWithCreator): string | null {
+  if (video.platform === "bilibili") {
+    const maybePic =
+      typeof video.raw === "object" &&
+      video.raw &&
+      "pic" in video.raw &&
+      typeof (video.raw as { pic?: unknown }).pic === "string"
+        ? (video.raw as { pic: string }).pic
+        : null;
+    return maybePic?.startsWith("//") ? `https:${maybePic}` : maybePic;
+  }
+
+  if (video.platform === "youtube") {
+    const raw = video.raw as { snippet?: { thumbnails?: { medium?: { url?: string }; default?: { url?: string }; high?: { url?: string } } } } | null;
+    const thumbnails = raw?.snippet?.thumbnails;
+    return thumbnails?.medium?.url ?? thumbnails?.default?.url ?? thumbnails?.high?.url ?? null;
+  }
+
+  return null;
+}
+
+function extractDuration(video: VideoWithCreator): string | null {
+  if (video.platform === "bilibili") {
+    const raw = video.raw as { length?: string } | null;
+    return raw?.length ?? null;
+  }
+  // YouTube duration requires separate API call; skip for now
+  return null;
+}
 
 export default async function Home({
   searchParams,
@@ -14,14 +55,7 @@ export default async function Home({
 
   let dbUnavailable = false;
   let creators: Array<{ id: string; name: string }> = [];
-  let videos: Array<{
-    id: string;
-    title: string;
-    url: string;
-    publishedAt: Date;
-    raw: unknown;
-    creator: { name: string; avatarUrl: string | null };
-  }> = [];
+  let videos: VideoWithCreator[] = [];
 
   try {
     creators = await db.creator.findMany({
@@ -75,29 +109,13 @@ export default async function Home({
         ) : (
           <ul className="threads-feed">
             {videos.map((video) => {
-              const maybePic =
-                typeof video.raw === "object" &&
-                video.raw &&
-                "pic" in video.raw &&
-                typeof (video.raw as { pic?: unknown }).pic === "string"
-                  ? (video.raw as { pic: string }).pic
-                  : null;
-              const maybeDuration =
-                typeof video.raw === "object" &&
-                video.raw &&
-                "length" in video.raw &&
-                typeof (video.raw as { length?: unknown }).length === "string"
-                  ? (video.raw as { length: string }).length
-                  : null;
-              const cover = maybePic
-                ? maybePic.startsWith("//")
-                  ? `https:${maybePic}`
-                  : maybePic
-                : null;
-              const proxiedCover = cover ? `/api/image/bili?url=${encodeURIComponent(cover)}` : null;
+              const cover = extractCoverUrl(video);
+              const duration = extractDuration(video);
+              const proxiedCover = cover ? `/api/image/proxy?url=${encodeURIComponent(cover)}` : null;
               const proxiedAvatar = video.creator.avatarUrl
-                ? `/api/image/bili?url=${encodeURIComponent(video.creator.avatarUrl)}`
+                ? `/api/image/proxy?url=${encodeURIComponent(video.creator.avatarUrl)}`
                 : null;
+              const platformBadge = video.platform === "bilibili" ? "B站" : "YT";
 
               return (
                 <li key={video.id} className="threads-item">
@@ -114,6 +132,9 @@ export default async function Home({
                   <article className="threads-content">
                     <div className="threads-head">
                       <span className="threads-name">{video.creator.name}</span>
+                      <span className="threads-platform" style={{ fontSize: 12, color: "#666", marginLeft: 8 }}>
+                        [{platformBadge}]
+                      </span>
                       <span className="threads-time">
                         {video.publishedAt.toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" })}
                       </span>
@@ -126,9 +147,9 @@ export default async function Home({
                     {proxiedCover ? (
                       <a href={video.url} target="_blank" rel="noreferrer" className="threads-image-wrap">
                         <img src={proxiedCover} alt={video.title} className="threads-image" />
-                        {maybeDuration ? (
-                          <span className="threads-duration" aria-label={`视频时长 ${maybeDuration}`}>
-                            {maybeDuration}
+                        {duration ? (
+                          <span className="threads-duration" aria-label={`视频时长 ${duration}`}>
+                            {duration}
                           </span>
                         ) : null}
                       </a>

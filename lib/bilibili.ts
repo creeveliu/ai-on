@@ -5,7 +5,7 @@ import { ProxyAgent } from "undici";
 import { getEnv } from "@/lib/env";
 
 type BiliVideo = {
-  bvid: string;
+  videoId: string;
   title: string;
   url: string;
   publishedAt: Date;
@@ -130,7 +130,7 @@ export async function fetchCreatorLatestVideos(mid: string): Promise<BiliVideo[]
       return list
         .filter((item) => item.bvid && item.title && item.created)
         .map((item) => ({
-          bvid: item.bvid!,
+          videoId: item.bvid!,
           title: item.title!,
           url: `https://www.bilibili.com/video/${item.bvid}`,
           publishedAt: new Date((item.created ?? 0) * 1000),
@@ -192,4 +192,26 @@ export async function fetchCreatorProfile(mid: string): Promise<BiliCreatorProfi
   }
 
   return { name, avatarUrl };
+}
+
+/**
+ * Parse Bilibili member ID (mid) from various input formats:
+ * - Direct mid: 12345
+ * - Space URL: https://space.bilibili.com/12345
+ * - Mobile space URL: https://m.bilibili.com/space/12345
+ */
+export function parseMid(value: string): string | null {
+  const input = value.trim();
+  if (!input) return null;
+  if (/^\d+$/.test(input)) return input;
+
+  // Supports links like:
+  // https://space.bilibili.com/12345
+  // https://m.bilibili.com/space/12345
+  const match = input.match(/(?:space\.bilibili\.com\/|\/space\/)(\d+)/i);
+  if (match?.[1]) return match[1];
+
+  // Last fallback: extract a number sequence from pasted content.
+  const loose = input.match(/(\d{3,})/);
+  return loose?.[1] ?? null;
 }

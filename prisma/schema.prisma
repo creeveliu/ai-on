@@ -9,6 +9,7 @@ datasource db {
 
 enum Platform {
   bilibili
+  youtube
 }
 
 enum JobName {
@@ -33,7 +34,7 @@ model Admin {
 model Creator {
   id           String   @id @default(cuid())
   platform     Platform @default(bilibili)
-  mid          String   @unique
+  platformId   String
   name         String
   avatarUrl    String?
   enabled      Boolean  @default(true)
@@ -43,13 +44,15 @@ model Creator {
 
   videos Video[]
 
+  @@unique([platform, platformId])
   @@index([enabled])
+  @@index([platform])
 }
 
 model Video {
   id          String   @id @default(cuid())
   platform    Platform @default(bilibili)
-  bvid        String   @unique
+  videoId     String
   creatorId   String
   title       String
   url         String
@@ -59,8 +62,10 @@ model Video {
 
   creator Creator @relation(fields: [creatorId], references: [id], onDelete: Cascade)
 
+  @@unique([platform, videoId])
   @@index([creatorId, publishedAt])
   @@index([publishedAt])
+  @@index([platform])
 }
 
 model Subscriber {
