@@ -60,15 +60,45 @@ export async function fetchCreatorLatestVideos(channelId: string): Promise<YouTu
 
   const items = playlistRes?.items ?? [];
 
+  // Extract video IDs
+  const videoIds = items
+    .filter((item: { contentDetails?: { videoId?: string } }) => item?.contentDetails?.videoId)
+    .map((item: { contentDetails: { videoId: string } }) => item.contentDetails.videoId);
+
+  // 3. Batch fetch video durations (up to 50 IDs per request)
+  let durationMap: Record<string, string> = {};
+  if (videoIds.length > 0) {
+    try {
+      const videosRes = await youtubeFetch("videos", {
+        part: "contentDetails",
+        id: videoIds.join(","),
+      });
+
+      for (const video of (videosRes?.items ?? [])) {
+        const vid = video?.id;
+        const duration = video?.contentDetails?.duration; // ISO 8601 format: "PT4M13S"
+        if (vid && duration) {
+          durationMap[vid] = duration;
+        }
+      }
+    } catch {
+      // Ignore duration fetch errors
+    }
+  }
+
   return items
     .filter((item: { contentDetails?: { videoId?: string } }) => item?.contentDetails?.videoId)
-    .map((item: { contentDetails: { videoId: string }; snippet: { title?: string; publishedAt?: string } }) => ({
-      videoId: item.contentDetails.videoId,
-      title: item.snippet?.title ?? "Untitled",
-      url: `https://www.youtube.com/watch?v=${item.contentDetails.videoId}`,
-      publishedAt: new Date(item.snippet?.publishedAt ?? Date.now()),
-      raw: item,
-    }));
+    .map((item: { contentDetails: { videoId: string }; snippet: { title?: string; publishedAt?: string } }) => {
+      const videoId = item.contentDetails.videoId;
+      const duration = durationMap[videoId];
+      return {
+        videoId,
+        title: item.snippet?.title ?? "Untitled",
+        url: `https://www.youtube.com/watch?v=${videoId}`,
+        publishedAt: new Date(item.snippet?.publishedAt ?? Date.now()),
+        raw: { ...item, duration },
+      };
+    });
 }
 
 export async function fetchCreatorProfile(channelId: string): Promise<YouTubeCreatorProfile> {

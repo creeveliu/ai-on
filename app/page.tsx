@@ -37,12 +37,37 @@ function extractCoverUrl(video: VideoWithCreator): string | null {
   return null;
 }
 
+/**
+ * Parse ISO 8601 duration (e.g., "PT4M13S") to readable format (e.g., "4:13")
+ */
+function parseIsoDuration(iso: string): string | null {
+  const match = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+  if (!match) return null;
+
+  const hours = match[1] ? parseInt(match[1]) : 0;
+  const minutes = match[2] ? parseInt(match[2]) : 0;
+  const seconds = match[3] ? parseInt(match[3]) : 0;
+
+  if (hours > 0) {
+    return `${hours}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+  }
+  return `${minutes}:${String(seconds).padStart(2, "0")}`;
+}
+
 function extractDuration(video: VideoWithCreator): string | null {
   if (video.platform === "bilibili") {
     const raw = video.raw as { length?: string } | null;
     return raw?.length ?? null;
   }
-  // YouTube duration requires separate API call; skip for now
+
+  if (video.platform === "youtube") {
+    const raw = video.raw as { duration?: string } | null;
+    const iso = raw?.duration;
+    if (iso) {
+      return parseIsoDuration(iso);
+    }
+  }
+
   return null;
 }
 
