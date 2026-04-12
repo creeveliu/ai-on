@@ -1,6 +1,6 @@
 import { JobStatus } from "@prisma/client";
 
-import { fetchCreatorLatestVideos } from "@/lib/bili";
+import { fetchCreatorLatestVideos, fetchCreatorProfile } from "@/lib/bili";
 import { db } from "@/lib/db";
 
 export async function runFetchVideosJob() {
@@ -12,7 +12,13 @@ export async function runFetchVideosJob() {
   const failures: Array<{ mid: string; reason: string }> = [];
 
   for (const creator of creators) {
+    let profileName: string | null = null;
+    let profileAvatarUrl: string | null = null;
+
     try {
+      const profile = await fetchCreatorProfile(creator.mid);
+      profileName = profile.name;
+      profileAvatarUrl = profile.avatarUrl;
       const videos = await fetchCreatorLatestVideos(creator.mid);
 
       for (const item of videos) {
@@ -39,11 +45,25 @@ export async function runFetchVideosJob() {
 
       await db.creator.update({
         where: { id: creator.id },
-        data: { lastFetchedAt: new Date() },
+        data: {
+          lastFetchedAt: new Date(),
+          name: profileName ?? creator.name,
+          avatarUrl: profileAvatarUrl,
+        },
       });
 
       successCount += 1;
     } catch (error) {
+      if (profileName || profileAvatarUrl) {
+        await db.creator.update({
+          where: { id: creator.id },
+          data: {
+            name: profileName ?? creator.name,
+            avatarUrl: profileAvatarUrl,
+          },
+        });
+      }
+
       failedCount += 1;
       failures.push({
         mid: creator.mid,

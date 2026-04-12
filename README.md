@@ -17,6 +17,8 @@ cp .env.example .env
 # 编辑 .env
 ```
 
+说明：`RESEND_API_KEY` 与 `MAIL_FROM` 可先留空；未配置时会跳过日报发信并写任务日志。
+
 3. 生成 Prisma Client 并执行迁移
 
 ```bash
@@ -58,7 +60,7 @@ npm run dev
 2. 在 Vercel 环境变量中配置 `.env.example` 里的全部变量。
 3. 确认 `CRON_SECRET` 已配置（Vercel Cron 请求会带 `Authorization: Bearer <CRON_SECRET>`）。
 4. 部署后在 `Settings -> Cron Jobs` 验证两条定时任务：
-   - `0 */2 * * *` 抓取视频
+   - `0 0 * * *` 抓取视频（每日一次）
    - `0 1 * * *` 发送摘要（UTC 01:00 = Asia/Shanghai 09:00）
 
 ## 4. Cron 与生产验证

@@ -26,7 +26,8 @@ export function SubscribeForm() {
       }
 
       setEmail("");
-      setMessage("订阅成功");
+      setMessage("订阅成功，后续会按日报节奏推送。",
+      );
     } catch {
       setMessage("订阅失败");
     } finally {
@@ -35,19 +36,19 @@ export function SubscribeForm() {
   }
 
   return (
-    <form onSubmit={onSubmit} style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+    <form onSubmit={onSubmit} className="ui-inline-form" style={{ gridTemplateColumns: "1fr auto", gap: 8 }}>
       <input
+        className="ui-input"
         type="email"
         required
         placeholder="you@example.com"
         value={email}
         onChange={(event) => setEmail(event.target.value)}
-        style={{ minWidth: 280, padding: "8px 10px" }}
       />
-      <button type="submit" disabled={loading}>
+      <button className="ui-button" type="submit" disabled={loading}>
         {loading ? "提交中..." : "订阅"}
       </button>
-      {message ? <span style={{ fontSize: 14 }}>{message}</span> : null}
+      {message ? <span className="ui-muted">{message}</span> : null}
     </form>
   );
 }

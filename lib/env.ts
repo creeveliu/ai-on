@@ -8,8 +8,8 @@ const envSchema = z.object({
   BILI_SESSDATA: z.string().min(1),
   BILI_PROXY: z.string().optional(),
   CRON_SECRET: z.string().min(1),
-  RESEND_API_KEY: z.string().min(1),
-  MAIL_FROM: z.string().email(),
+  RESEND_API_KEY: z.string().min(1).optional(),
+  MAIL_FROM: z.string().min(1).optional(),
   NEXT_PUBLIC_SITE_URL: z.string().url().optional(),
 });
 

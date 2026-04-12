@@ -1,6 +1,7 @@
 import { JobStatus } from "@prisma/client";
 
 import { db } from "@/lib/db";
+import { getEnv } from "@/lib/env";
 import { sendDigestEmail } from "@/lib/mail/digest";
 
 function digestDateKey(date: Date) {
@@ -11,6 +12,19 @@ function digestDateKey(date: Date) {
 }
 
 export async function runSendDigestJob() {
+  const env = getEnv();
+  if (!env.RESEND_API_KEY || !env.MAIL_FROM) {
+    const summary = "Mail provider not configured, digest skipped";
+    await db.jobLog.create({
+      data: {
+        jobName: "send_digest",
+        status: "success",
+        summary,
+      },
+    });
+    return { status: "success" as JobStatus, summary, sent: 0, failed: 0 };
+  }
+
   const now = new Date();
   const dateKey = digestDateKey(now);
   const since = new Date(now.getTime() - 24 * 60 * 60 * 1000);

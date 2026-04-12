@@ -35,6 +35,7 @@ model Creator {
   platform     Platform @default(bilibili)
   mid          String   @unique
   name         String
+  avatarUrl    String?
   enabled      Boolean  @default(true)
   lastFetchedAt DateTime?
   createdAt    DateTime @default(now())

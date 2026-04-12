@@ -12,6 +12,11 @@ type BiliVideo = {
   raw: unknown;
 };
 
+type BiliCreatorProfile = {
+  name: string | null;
+  avatarUrl: string | null;
+};
+
 const MIXIN_KEY_ENC_TAB = [
   46, 47, 18, 2, 53, 8, 23, 32, 15, 50, 10, 31, 58, 3, 45, 35, 27, 43, 5,
   49, 33, 9, 42, 19, 29, 28, 14, 39, 12, 38, 41, 13, 37, 48, 7, 16, 24, 55,
@@ -48,22 +53,37 @@ function signParams(params: Record<string, string | number>, mixinKey: string) {
 async function biliFetch(url: string) {
   const { BILI_SESSDATA, BILI_PROXY } = getEnv();
 
-  const init: RequestInit & { dispatcher?: ProxyAgent } = {
+  const createInit = (useProxy: boolean): RequestInit & { dispatcher?: ProxyAgent } => ({
     headers: {
       Cookie: `SESSDATA=${BILI_SESSDATA}`,
       Referer: "https://www.bilibili.com",
+      Accept: "application/json, text/plain, */*",
       "User-Agent":
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
     },
-  };
+    dispatcher: useProxy && BILI_PROXY ? new ProxyAgent(BILI_PROXY) : undefined,
+  });
 
-  if (BILI_PROXY) {
-    init.dispatcher = new ProxyAgent(BILI_PROXY);
+  const attempts = BILI_PROXY ? [true, false] : [false];
+  let lastError: Error | null = null;
+
+  for (const useProxy of attempts) {
+    try {
+      const res = await fetch(url, createInit(useProxy));
+      const contentType = res.headers.get("content-type") ?? "";
+      const text = await res.text();
+
+      if (contentType.includes("text/html") || text.startsWith("<!DOCTYPE")) {
+        throw new Error(`Bilibili returned HTML (${useProxy ? "via proxy" : "direct"})`);
+      }
+
+      return JSON.parse(text);
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error("Unknown biliFetch error");
+    }
   }
 
-  const res = await fetch(url, init);
-  const json = await res.json();
-  return json;
+  throw lastError ?? new Error("biliFetch failed");
 }
 
 async function getMixinKey() {
@@ -127,4 +147,49 @@ export async function fetchCreatorLatestVideos(mid: string): Promise<BiliVideo[]
   }
 
   throw new Error("Bilibili fetch exhausted retries");
+}
+
+export async function fetchCreatorDisplayName(mid: string): Promise<string | null> {
+  const profile = await fetchCreatorProfile(mid);
+  if (profile.name) return profile.name;
+
+  const mixinKey = await getMixinKey();
+  const infoParams = signParams({ mid }, mixinKey);
+  const infoEndpoint = `https://api.bilibili.com/x/space/wbi/acc/info?${infoParams.toString()}`;
+  const infoJson = await biliFetch(infoEndpoint);
+
+  if (Number(infoJson?.code ?? -1) === 0) {
+    const name = String(infoJson?.data?.name ?? "").trim();
+    if (name) return name;
+  }
+
+  // Fallback for accounts where acc/info is risk-blocked.
+  const arcParams = signParams(
+    {
+      mid,
+      ps: 1,
+      pn: 1,
+      order: "pubdate",
+    },
+    mixinKey,
+  );
+  const arcEndpoint = `https://api.bilibili.com/x/space/wbi/arc/search?${arcParams.toString()}`;
+  const arcJson = await biliFetch(arcEndpoint);
+  const author = String(arcJson?.data?.list?.vlist?.[0]?.author ?? "").trim();
+  return author || null;
+}
+
+export async function fetchCreatorProfile(mid: string): Promise<BiliCreatorProfile> {
+  const cardJson = await biliFetch(`https://api.bilibili.com/x/web-interface/card?mid=${encodeURIComponent(mid)}`);
+  if (Number(cardJson?.code ?? -1) !== 0) {
+    return { name: null, avatarUrl: null };
+  }
+
+  const name = String(cardJson?.data?.card?.name ?? "").trim() || null;
+  let avatarUrl = String(cardJson?.data?.card?.face ?? "").trim() || null;
+  if (avatarUrl?.startsWith("//")) {
+    avatarUrl = `https:${avatarUrl}`;
+  }
+
+  return { name, avatarUrl };
 }

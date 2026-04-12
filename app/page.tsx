@@ -1,8 +1,9 @@
 import Link from "next/link";
 
 import { db } from "@/lib/db";
+import { isDbReachabilityError } from "@/lib/prisma-error";
 
-import { SubscribeForm } from "./subscribe-form";
+import { SubscribePopover } from "./subscribe-popover";
 
 export default async function Home({
   searchParams,
@@ -11,59 +12,135 @@ export default async function Home({
 }) {
   const { creator } = await searchParams;
 
-  const creators = await db.creator.findMany({
-    where: { enabled: true },
-    orderBy: { name: "asc" },
-  });
+  let dbUnavailable = false;
+  let creators: Array<{ id: string; name: string }> = [];
+  let videos: Array<{
+    id: string;
+    title: string;
+    url: string;
+    publishedAt: Date;
+    raw: unknown;
+    creator: { name: string; avatarUrl: string | null };
+  }> = [];
 
-  const videos = await db.video.findMany({
-    where: creator ? { creatorId: creator } : undefined,
-    include: { creator: true },
-    orderBy: { publishedAt: "desc" },
-    take: 100,
-  });
+  try {
+    creators = await db.creator.findMany({
+      where: { enabled: true },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true },
+    });
+
+    videos = await db.video.findMany({
+      where: creator ? { creatorId: creator } : undefined,
+      include: { creator: { select: { name: true, avatarUrl: true } } },
+      orderBy: { publishedAt: "desc" },
+      take: 100,
+    });
+  } catch (error) {
+    if (isDbReachabilityError(error)) {
+      dbUnavailable = true;
+    } else {
+      throw error;
+    }
+  }
 
   return (
-    <main style={{ maxWidth: 920, margin: "0 auto", padding: 24 }}>
-      <header style={{ marginBottom: 24 }}>
-        <h1 style={{ marginBottom: 8 }}>Bilibili Digest</h1>
-        <p style={{ color: "#666", marginBottom: 16 }}>最新视频（本地数据库）</p>
-        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-          <Link href="/">全部</Link>
-          {creators.map((item) => (
-            <Link key={item.id} href={`/?creator=${item.id}`}>
-              {item.name}
-            </Link>
-          ))}
-          <Link href="/admin/login" style={{ marginLeft: "auto" }}>
-            管理后台
+    <main className="threads-root">
+      <header className="threads-topbar">
+        <div className="threads-topbar-title">AI ON</div>
+        <div className="threads-topbar-actions">
+          <SubscribePopover />
+          <Link href="/admin/login" className="threads-admin-link">
+            后台
           </Link>
         </div>
       </header>
 
-      <section style={{ marginBottom: 28, padding: 16, border: "1px solid #e5e7eb", borderRadius: 8 }}>
-        <h2 style={{ marginTop: 0 }}>邮件订阅</h2>
-        <SubscribeForm />
-      </section>
+      <section className="threads-board">
+        <div className="threads-creator-filter">
+          <Link href="/" className={!creator ? "is-active" : ""}>
+            全部
+          </Link>
+          {creators.map((item) => (
+            <Link key={item.id} href={`/?creator=${item.id}`} className={creator === item.id ? "is-active" : ""}>
+              {item.name}
+            </Link>
+          ))}
+        </div>
 
-      <section>
+        {dbUnavailable ? <p className="threads-alert">数据库暂时不可达，请稍后重试。</p> : null}
+
         {videos.length === 0 ? (
-          <p>暂无数据，请先在后台添加主播并执行抓取任务。</p>
+          <p className="threads-empty">暂无数据</p>
         ) : (
-          <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "grid", gap: 12 }}>
-            {videos.map((video) => (
-              <li key={video.id} style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 14 }}>
-                <div style={{ fontSize: 13, color: "#666", marginBottom: 8 }}>
-                  {video.creator.name} · {video.publishedAt.toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" })}
-                </div>
-                <a href={video.url} target="_blank" rel="noreferrer" style={{ fontWeight: 600 }}>
-                  {video.title}
-                </a>
-              </li>
-            ))}
+          <ul className="threads-feed">
+            {videos.map((video) => {
+              const maybePic =
+                typeof video.raw === "object" &&
+                video.raw &&
+                "pic" in video.raw &&
+                typeof (video.raw as { pic?: unknown }).pic === "string"
+                  ? (video.raw as { pic: string }).pic
+                  : null;
+              const maybeDuration =
+                typeof video.raw === "object" &&
+                video.raw &&
+                "length" in video.raw &&
+                typeof (video.raw as { length?: unknown }).length === "string"
+                  ? (video.raw as { length: string }).length
+                  : null;
+              const cover = maybePic
+                ? maybePic.startsWith("//")
+                  ? `https:${maybePic}`
+                  : maybePic
+                : null;
+              const proxiedCover = cover ? `/api/image/bili?url=${encodeURIComponent(cover)}` : null;
+              const proxiedAvatar = video.creator.avatarUrl
+                ? `/api/image/bili?url=${encodeURIComponent(video.creator.avatarUrl)}`
+                : null;
+
+              return (
+                <li key={video.id} className="threads-item">
+                  <div className="threads-rail">
+                    <div className="threads-avatar">
+                      {proxiedAvatar ? (
+                        <img src={proxiedAvatar} alt={video.creator.name} className="threads-avatar-image" />
+                      ) : (
+                        video.creator.name.slice(0, 1)
+                      )}
+                    </div>
+                  </div>
+
+                  <article className="threads-content">
+                    <div className="threads-head">
+                      <span className="threads-name">{video.creator.name}</span>
+                      <span className="threads-time">
+                        {video.publishedAt.toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" })}
+                      </span>
+                    </div>
+
+                    <a className="threads-text" href={video.url} target="_blank" rel="noreferrer">
+                      {video.title}
+                    </a>
+
+                    {proxiedCover ? (
+                      <a href={video.url} target="_blank" rel="noreferrer" className="threads-image-wrap">
+                        <img src={proxiedCover} alt={video.title} className="threads-image" />
+                        {maybeDuration ? (
+                          <span className="threads-duration" aria-label={`视频时长 ${maybeDuration}`}>
+                            {maybeDuration}
+                          </span>
+                        ) : null}
+                      </a>
+                    ) : null}
+                  </article>
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>
+
     </main>
   );
 }

@@ -2,56 +2,89 @@ import Link from "next/link";
 
 import { requireAdminSession } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { isDbReachabilityError } from "@/lib/prisma-error";
 
 export default async function JobsPage() {
   await requireAdminSession();
 
-  const logs = await db.jobLog.findMany({
-    orderBy: { createdAt: "desc" },
-    take: 100,
-  });
+  let dbUnavailable = false;
+  let logs: Array<{
+    id: string;
+    createdAt: Date;
+    jobName: string;
+    status: string;
+    summary: string;
+  }> = [];
+
+  try {
+    logs = await db.jobLog.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 100,
+      select: { id: true, createdAt: true, jobName: true, status: true, summary: true },
+    });
+  } catch (error) {
+    if (isDbReachabilityError(error)) {
+      dbUnavailable = true;
+    } else {
+      throw error;
+    }
+  }
 
   return (
-    <main style={{ maxWidth: 920, margin: "0 auto", padding: 24 }}>
-      <h1>任务日志</h1>
-      <nav style={{ display: "flex", gap: 12, marginBottom: 18 }}>
-        <Link href="/admin/creators">主播</Link>
-        <Link href="/admin/subscribers">订阅者</Link>
-        <Link href="/admin/jobs">任务日志</Link>
-        <Link href="/">首页</Link>
-      </nav>
+    <main className="ui-shell ui-grid">
+      <header className="ui-header">
+        <h1 className="ui-title" style={{ fontSize: "clamp(32px, 5vw, 48px)" }}>
+          任务日志
+        </h1>
+        <p className="ui-subtitle">查看抓取与摘要发送执行结果，可手动触发任务。</p>
+        <div className="ui-nav">
+          <Link href="/admin/creators">主播</Link>
+          <Link href="/admin/subscribers">订阅者</Link>
+          <Link href="/admin/jobs">任务日志</Link>
+          <Link href="/">首页</Link>
+        </div>
+      </header>
 
-      <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
-        <form action="/api/jobs/fetch-videos" method="post">
-          <button type="submit">手动执行抓取</button>
-        </form>
-        <form action="/api/jobs/send-digest" method="post">
-          <button type="submit">手动发送日报</button>
-        </form>
-      </div>
+      <section className="ui-panel">
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+          <form action="/api/jobs/fetch-videos" method="post">
+            <button className="ui-button" type="submit">
+              手动执行抓取
+            </button>
+          </form>
+          <form action="/api/jobs/send-digest" method="post">
+            <button className="ui-button ui-button--ghost" type="submit">
+              手动发送日报
+            </button>
+          </form>
+        </div>
+      </section>
 
-      <table style={{ width: "100%", borderCollapse: "collapse" }}>
-        <thead>
-          <tr>
-            <th style={{ textAlign: "left", borderBottom: "1px solid #ddd", padding: "8px 6px" }}>时间</th>
-            <th style={{ textAlign: "left", borderBottom: "1px solid #ddd", padding: "8px 6px" }}>任务</th>
-            <th style={{ textAlign: "left", borderBottom: "1px solid #ddd", padding: "8px 6px" }}>状态</th>
-            <th style={{ textAlign: "left", borderBottom: "1px solid #ddd", padding: "8px 6px" }}>摘要</th>
-          </tr>
-        </thead>
-        <tbody>
-          {logs.map((log) => (
-            <tr key={log.id}>
-              <td style={{ borderBottom: "1px solid #f1f5f9", padding: "8px 6px" }}>
-                {log.createdAt.toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" })}
-              </td>
-              <td style={{ borderBottom: "1px solid #f1f5f9", padding: "8px 6px" }}>{log.jobName}</td>
-              <td style={{ borderBottom: "1px solid #f1f5f9", padding: "8px 6px" }}>{log.status}</td>
-              <td style={{ borderBottom: "1px solid #f1f5f9", padding: "8px 6px" }}>{log.summary}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <section className="ui-panel">
+        {dbUnavailable ? <p className="ui-alert">数据库暂时不可达，请稍后重试。</p> : null}
+        <div className="ui-table-wrap ui-space-top">
+          <table className="ui-table">
+            <thead>
+              <tr>
+                <th>时间</th>
+                <th>任务</th>
+                <th>状态</th>
+                <th>摘要</th>
+              </tr>
+            </thead>
+            <tbody>
+              {logs.map((log) => (
+                <tr key={log.id}>
+                  <td>{log.createdAt.toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" })}</td>
+                  <td>{log.jobName}</td>
+                  <td>{log.status}</td>
+                  <td>{log.summary}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
     </main>
   );
 }

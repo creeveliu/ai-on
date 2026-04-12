@@ -31,6 +31,9 @@ function renderDigestHtml(videos: DigestVideo[]) {
 
 export async function sendDigestEmail(to: string, videos: DigestVideo[]) {
   const env = getEnv();
+  if (!env.RESEND_API_KEY || !env.MAIL_FROM) {
+    throw new Error("RESEND_API_KEY or MAIL_FROM is missing");
+  }
   const resend = new Resend(env.RESEND_API_KEY);
 
   await resend.emails.send({

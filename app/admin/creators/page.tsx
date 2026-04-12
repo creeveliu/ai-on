@@ -2,72 +2,121 @@ import Link from "next/link";
 
 import { requireAdminSession } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { isDbReachabilityError } from "@/lib/prisma-error";
 
 export default async function CreatorsPage() {
   await requireAdminSession();
 
-  const creators = await db.creator.findMany({
-    orderBy: { createdAt: "desc" },
-  });
+  let dbUnavailable = false;
+  let creators: Array<{
+    id: string;
+    name: string;
+    mid: string;
+    enabled: boolean;
+    lastFetchedAt: Date | null;
+  }> = [];
+
+  try {
+    creators = await db.creator.findMany({
+      orderBy: { createdAt: "desc" },
+      select: { id: true, name: true, mid: true, enabled: true, lastFetchedAt: true },
+    });
+  } catch (error) {
+    if (isDbReachabilityError(error)) {
+      dbUnavailable = true;
+    } else {
+      throw error;
+    }
+  }
 
   return (
-    <main style={{ maxWidth: 920, margin: "0 auto", padding: 24 }}>
-      <h1>主播管理</h1>
-      <nav style={{ display: "flex", gap: 12, marginBottom: 18 }}>
-        <Link href="/admin/creators">主播</Link>
-        <Link href="/admin/subscribers">订阅者</Link>
-        <Link href="/admin/jobs">任务日志</Link>
-        <Link href="/">首页</Link>
-      </nav>
+    <main className="ui-shell ui-grid">
+      <header className="ui-header">
+        <h1 className="ui-title" style={{ fontSize: "clamp(32px, 5vw, 48px)" }}>
+          主播管理
+        </h1>
+        <p className="ui-subtitle">维护追踪主播列表，供抓取任务执行。</p>
+        <div className="ui-nav">
+          <Link href="/admin/creators">主播</Link>
+          <Link href="/admin/subscribers">订阅者</Link>
+          <Link href="/admin/jobs">任务日志</Link>
+          <Link href="/">首页</Link>
+        </div>
+      </header>
 
-      <section style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 14, marginBottom: 20 }}>
-        <h2 style={{ marginTop: 0 }}>添加主播</h2>
-        <form action="/api/admin/creators" method="post" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          <input name="name" placeholder="名称" required style={{ padding: "8px 10px" }} />
-          <input name="mid" placeholder="Bilibili MID" required style={{ padding: "8px 10px" }} />
-          <label style={{ display: "flex", gap: 6, alignItems: "center" }}>
-            <input name="enabled" type="checkbox" defaultChecked /> 启用
-          </label>
-          <button type="submit">保存</button>
+      <section className="ui-panel">
+        <h2>添加主播</h2>
+        <p className="ui-muted" style={{ marginBottom: 10 }}>
+          只需粘贴 Bilibili 空间链接，系统会自动识别名称，默认启用并立即抓取。
+        </p>
+        <form action="/api/admin/creators" method="post" className="ui-inline-form">
+          <input className="ui-input" name="link" placeholder="https://space.bilibili.com/xxxxxx" required />
+          <button className="ui-button" type="submit">
+            保存
+          </button>
         </form>
       </section>
 
-      <table style={{ width: "100%", borderCollapse: "collapse" }}>
-        <thead>
-          <tr>
-            <th style={{ textAlign: "left", borderBottom: "1px solid #ddd", padding: "8px 6px" }}>名称</th>
-            <th style={{ textAlign: "left", borderBottom: "1px solid #ddd", padding: "8px 6px" }}>MID</th>
-            <th style={{ textAlign: "left", borderBottom: "1px solid #ddd", padding: "8px 6px" }}>状态</th>
-            <th style={{ textAlign: "left", borderBottom: "1px solid #ddd", padding: "8px 6px" }}>上次抓取</th>
-            <th style={{ textAlign: "right", borderBottom: "1px solid #ddd", padding: "8px 6px" }}>操作</th>
-          </tr>
-        </thead>
-        <tbody>
-          {creators.map((creator) => (
-            <tr key={creator.id}>
-              <td style={{ borderBottom: "1px solid #f1f5f9", padding: "8px 6px" }}>{creator.name}</td>
-              <td style={{ borderBottom: "1px solid #f1f5f9", padding: "8px 6px" }}>{creator.mid}</td>
-              <td style={{ borderBottom: "1px solid #f1f5f9", padding: "8px 6px" }}>
-                {creator.enabled ? "enabled" : "disabled"}
-              </td>
-              <td style={{ borderBottom: "1px solid #f1f5f9", padding: "8px 6px" }}>
-                {creator.lastFetchedAt
-                  ? creator.lastFetchedAt.toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" })
-                  : "-"}
-              </td>
-              <td style={{ borderBottom: "1px solid #f1f5f9", padding: "8px 6px", textAlign: "right" }}>
-                <form action={`/api/admin/creators/${creator.id}/delete`} method="post">
-                  <button type="submit">删除</button>
-                </form>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <section className="ui-panel">
+        {dbUnavailable ? <p className="ui-alert">数据库暂时不可达，请稍后重试。</p> : null}
+        <div className="ui-table-wrap ui-space-top">
+          <table className="ui-table">
+            <thead>
+              <tr>
+                <th>名称</th>
+                <th>MID</th>
+                <th>状态</th>
+                <th>上次抓取</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              {creators.map((creator) => (
+                <tr key={creator.id}>
+                  <td>
+                    <form
+                      action={`/api/admin/creators/${creator.id}/update`}
+                      method="post"
+                      style={{ display: "inline-flex", gap: 8, alignItems: "center" }}
+                    >
+                      <input
+                        className="ui-input"
+                        name="name"
+                        defaultValue={creator.name}
+                        required
+                        style={{ padding: "6px 10px", fontSize: 12, minWidth: 160 }}
+                      />
+                      <button className="ui-button ui-button--ghost" type="submit" style={{ padding: "6px 10px" }}>
+                        保存
+                      </button>
+                    </form>
+                  </td>
+                  <td>{creator.mid}</td>
+                  <td>{creator.enabled ? "enabled" : "disabled"}</td>
+                  <td>
+                    {creator.lastFetchedAt
+                      ? creator.lastFetchedAt.toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" })
+                      : "-"}
+                  </td>
+                  <td>
+                    <form action={`/api/admin/creators/${creator.id}/delete`} method="post">
+                      <button className="ui-button ui-button--ghost" type="submit">
+                        删除
+                      </button>
+                    </form>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
 
-      <form action="/api/admin/logout" method="post" style={{ marginTop: 18 }}>
-        <button type="submit">退出登录</button>
-      </form>
+        <form action="/api/admin/logout" method="post" className="ui-space-top">
+          <button className="ui-button ui-button--ghost" type="submit">
+            退出登录
+          </button>
+        </form>
+      </section>
     </main>
   );
 }
