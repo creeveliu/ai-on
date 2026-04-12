@@ -1,0 +1,100 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Platform {
+  bilibili
+}
+
+enum JobName {
+  fetch_videos
+  send_digest
+}
+
+enum JobStatus {
+  success
+  partial
+  failed
+}
+
+model Admin {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Creator {
+  id           String   @id @default(cuid())
+  platform     Platform @default(bilibili)
+  mid          String   @unique
+  name         String
+  enabled      Boolean  @default(true)
+  lastFetchedAt DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  videos Video[]
+
+  @@index([enabled])
+}
+
+model Video {
+  id          String   @id @default(cuid())
+  platform    Platform @default(bilibili)
+  bvid        String   @unique
+  creatorId   String
+  title       String
+  url         String
+  publishedAt DateTime
+  raw         Json?
+  createdAt   DateTime @default(now())
+
+  creator Creator @relation(fields: [creatorId], references: [id], onDelete: Cascade)
+
+  @@index([creatorId, publishedAt])
+  @@index([publishedAt])
+}
+
+model Subscriber {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  digestLogs DigestSendLog[]
+
+  @@index([enabled])
+}
+
+model JobLog {
+  id        String    @id @default(cuid())
+  jobName   JobName
+  status    JobStatus
+  summary   String
+  meta      Json?
+  createdAt DateTime  @default(now())
+
+  @@index([jobName, createdAt])
+}
+
+model DigestSendLog {
+  id           String    @id @default(cuid())
+  subscriberId String
+  dateKey      String
+  status       JobStatus
+  error        String?
+  createdAt    DateTime  @default(now())
+
+  subscriber Subscriber @relation(fields: [subscriberId], references: [id], onDelete: Cascade)
+
+  @@unique([subscriberId, dateKey])
+  @@index([dateKey, createdAt])
+}
