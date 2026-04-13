@@ -4,6 +4,7 @@ import Link from "next/link";
 import { db } from "@/lib/db";
 import { isDbReachabilityError } from "@/lib/prisma-error";
 
+import { CreatorFilter } from "./creator-filter";
 import { SubscribePopover } from "./subscribe-popover";
 
 type VideoWithCreator = {
@@ -116,16 +117,7 @@ export default async function Home({
       </header>
 
       <section className="threads-board">
-        <div className="threads-creator-filter">
-          <Link href="/" className={!creator ? "is-active" : ""}>
-            全部
-          </Link>
-          {creators.map((item) => (
-            <Link key={item.id} href={`/?creator=${item.id}`} className={creator === item.id ? "is-active" : ""}>
-              {item.name}
-            </Link>
-          ))}
-        </div>
+        <CreatorFilter creators={creators} activeId={creator} />
 
         {dbUnavailable ? <p className="threads-alert">数据库暂时不可达，请稍后重试。</p> : null}
 

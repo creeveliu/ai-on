@@ -126,25 +126,11 @@ a {
   padding: 9px 16px;
   border-bottom: 1px solid var(--line);
   overflow-x: auto;
-  scrollbar-width: thin;
-  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+  scrollbar-width: none; /* Firefox */
 }
 
 .threads-creator-filter::-webkit-scrollbar {
-  height: 6px;
-}
-
-.threads-creator-filter::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-.threads-creator-filter::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 3px;
-}
-
-.threads-creator-filter::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.35);
+  display: none; /* Chrome, Safari, Edge */
 }
 
 .threads-creator-filter a {
