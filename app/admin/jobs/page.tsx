@@ -53,7 +53,7 @@ export default async function JobsPage() {
             </button>
           </form>
           <p style={{ fontSize: 14, opacity: 0.7 }}>
-            任务执行约需 15-30 秒，提交后可稍后刷新页面查看结果。
+            抓取约 15-30 秒，若有失败会自动等 60 秒重试（最多 2 分钟）。提交后可稍后刷新查看。
           </p>
         </div>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 12 }}>
