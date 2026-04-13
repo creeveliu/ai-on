@@ -127,11 +127,11 @@ a {
   border-bottom: 1px solid var(--line);
   overflow-x: auto;
   scrollbar-width: thin;
-  scrollbar-color: transparent transparent;
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
 }
 
 .threads-creator-filter::-webkit-scrollbar {
-  height: 4px;
+  height: 6px;
 }
 
 .threads-creator-filter::-webkit-scrollbar-track {
@@ -139,12 +139,12 @@ a {
 }
 
 .threads-creator-filter::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
 }
 
 .threads-creator-filter::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.35);
 }
 
 .threads-creator-filter a {
