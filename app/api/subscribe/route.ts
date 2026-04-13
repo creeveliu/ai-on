@@ -18,7 +18,9 @@ export async function POST(req: NextRequest) {
       create: { email, enabled: true },
     });
 
-    await sendConfirmationEmail(subscriber.email, subscriber.unsubscribeToken);
+    if (subscriber.unsubscribeToken) {
+      await sendConfirmationEmail(subscriber.email, subscriber.unsubscribeToken);
+    }
 
     return NextResponse.json({ ok: true, unsubscribeToken: subscriber.unsubscribeToken });
   } catch (error) {
