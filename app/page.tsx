@@ -72,6 +72,27 @@ function extractDuration(video: VideoWithCreator): string | null {
   return null;
 }
 
+function PlatformIcon({ platform }: { platform: Platform }) {
+  if (platform === "bilibili") {
+    return (
+      <img
+        src="/bilibili.svg"
+        alt="Bilibili"
+        className="threads-platform-icon"
+        style={{ width: 16, height: 16 }}
+      />
+    );
+  }
+  return (
+    <img
+      src="/youtube.svg"
+      alt="YouTube"
+      className="threads-platform-icon"
+      style={{ width: 16, height: 16 }}
+    />
+  );
+}
+
 export default async function Home({
   searchParams,
 }: {
@@ -132,7 +153,6 @@ export default async function Home({
               const proxiedAvatar = video.creator.avatarUrl
                 ? `/api/image/proxy?url=${encodeURIComponent(video.creator.avatarUrl)}`
                 : null;
-              const platformBadge = video.platform === "bilibili" ? "B站" : "YT";
 
               return (
                 <li key={video.id} className="threads-item">
@@ -149,9 +169,7 @@ export default async function Home({
                   <article className="threads-content">
                     <div className="threads-head">
                       <span className="threads-name">{video.creator.name}</span>
-                      <span className="threads-platform" style={{ fontSize: 12, color: "#666", marginLeft: 8 }}>
-                        [{platformBadge}]
-                      </span>
+                      <PlatformIcon platform={video.platform} />
                       <span className="threads-time">
                         {video.publishedAt.toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" })}
                       </span>
