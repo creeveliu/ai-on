@@ -169,7 +169,6 @@ export default async function Home({
                   <article className="threads-content">
                     <div className="threads-head">
                       <span className="threads-name">{video.creator.name}</span>
-                      <PlatformIcon platform={video.platform} />
                       <span className="threads-time">
                         {video.publishedAt.toLocaleString("zh-CN", { timeZone: "Asia/Shanghai" })}
                       </span>
@@ -181,6 +180,9 @@ export default async function Home({
 
                     {proxiedCover ? (
                       <a href={video.url} target="_blank" rel="noreferrer" className="threads-image-wrap">
+                        <span className="threads-platform-badge">
+                          <PlatformIcon platform={video.platform} />
+                        </span>
                         <img src={proxiedCover} alt={video.title} className="threads-image" />
                         {duration ? (
                           <span className="threads-duration" aria-label={`视频时长 ${duration}`}>
