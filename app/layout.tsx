@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Bilibili Digest",
-  description: "Bilibili-first daily digest site",
+  title: "AI-ON",
+  description: "AI 驱动的 B 站创作者聚合与日报推送",
 };
 
 export default function RootLayout({
