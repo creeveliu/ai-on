@@ -46,12 +46,17 @@ export default async function JobsPage() {
       </header>
 
       <section className="ui-panel">
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
           <form action="/api/jobs/fetch-videos" method="post">
             <button className="ui-button" type="submit">
               手动执行抓取
             </button>
           </form>
+          <p style={{ fontSize: 14, opacity: 0.7 }}>
+            任务执行约需 15-30 秒，提交后可稍后刷新页面查看结果。
+          </p>
+        </div>
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 12 }}>
           <form action="/api/jobs/send-digest" method="post">
             <button className="ui-button ui-button--ghost" type="submit">
               手动发送日报

@@ -79,6 +79,11 @@ export async function runFetchVideosJob() {
         reason: error instanceof Error ? error.message : "Unknown error",
       });
     }
+
+    // 每个 creator 间隔 2 秒，降低 B站反爬风控概率
+    if (creators.length > 1) {
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+    }
   }
 
   const status: JobStatus =
