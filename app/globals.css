@@ -120,17 +120,53 @@ a {
   display: block;
 }
 
+.threads-creator-filter-wrapper {
+  position: relative;
+  border-bottom: 1px solid var(--line);
+}
+
 .threads-creator-filter {
   display: flex;
   gap: 6px;
   padding: 9px 16px;
-  border-bottom: 1px solid var(--line);
   overflow-x: auto;
   scrollbar-width: none; /* Firefox */
 }
 
 .threads-creator-filter::-webkit-scrollbar {
   display: none; /* Chrome, Safari, Edge */
+}
+
+.threads-scroll-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  font-size: 18px;
+  line-height: 1;
+  border-radius: 50%;
+  cursor: pointer;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+}
+
+.threads-scroll-arrow:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.threads-scroll-arrow-left {
+  left: 4px;
+}
+
+.threads-scroll-arrow-right {
+  right: 4px;
 }
 
 .threads-creator-filter a {
