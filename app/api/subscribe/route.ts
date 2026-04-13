@@ -18,8 +18,12 @@ export async function POST(req: NextRequest) {
       create: { email, enabled: true },
     });
 
-    if (subscriber.unsubscribeToken) {
-      await sendConfirmationEmail(subscriber.email, subscriber.unsubscribeToken);
+    try {
+      if (subscriber.unsubscribeToken) {
+        await sendConfirmationEmail(subscriber.email, subscriber.unsubscribeToken);
+      }
+    } catch (emailError) {
+      console.error('Failed to send confirmation email:', emailError instanceof Error ? emailError.message : emailError);
     }
 
     return NextResponse.json({ ok: true, unsubscribeToken: subscriber.unsubscribeToken });
