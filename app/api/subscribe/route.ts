@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { db } from "@/lib/db";
 import { wantsJson } from "@/lib/http";
+import { sendConfirmationEmail } from "@/lib/mail/digest";
 
 const bodySchema = z.object({ email: z.string().email() });
 
@@ -11,13 +12,15 @@ export async function POST(req: NextRequest) {
     const raw = await req.json();
     const { email } = bodySchema.parse(raw);
 
-    await db.subscriber.upsert({
+    const subscriber = await db.subscriber.upsert({
       where: { email },
       update: { enabled: true },
       create: { email, enabled: true },
     });
 
-    return NextResponse.json({ ok: true });
+    await sendConfirmationEmail(subscriber.email, subscriber.unsubscribeToken);
+
+    return NextResponse.json({ ok: true, unsubscribeToken: subscriber.unsubscribeToken });
   } catch (error) {
     if (!wantsJson(req)) {
       return NextResponse.redirect(new URL("/?subscribe=failed", req.url));
