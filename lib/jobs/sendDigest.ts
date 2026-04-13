@@ -73,7 +73,7 @@ export async function runSendDigestJob() {
           url: video.url,
           publishedAt: video.publishedAt,
         })),
-        subscriber.unsubscribeToken,
+        subscriber.unsubscribeToken ?? undefined,
       );
 
       await db.digestSendLog.create({
