@@ -6,6 +6,7 @@ import { redirectTo } from "@/lib/http";
 import { runFetchVideosJob } from "@/lib/jobs/fetchVideos";
 
 export const runtime = "nodejs";
+export const maxDuration = 180;
 
 function isAuthorized(req: NextRequest) {
   const auth = req.headers.get("authorization") ?? "";
