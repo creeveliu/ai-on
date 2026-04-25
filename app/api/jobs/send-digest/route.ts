@@ -6,10 +6,20 @@ import { redirectTo } from "@/lib/http";
 import { runSendDigestJob } from "@/lib/jobs/sendDigest";
 
 export const runtime = "nodejs";
+export const maxDuration = 180;
 
 function isAuthorized(req: NextRequest) {
   const auth = req.headers.get("authorization") ?? "";
   return auth === `Bearer ${getEnv().CRON_SECRET}`;
+}
+
+export async function GET(req: NextRequest) {
+  if (!isAuthorized(req)) {
+    return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+  }
+
+  const result = await runSendDigestJob();
+  return NextResponse.json({ ok: true, ...result });
 }
 
 export async function POST(req: NextRequest) {
