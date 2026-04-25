@@ -53,8 +53,10 @@ npm run dev
 2. 在 Vercel 环境变量里配置 `.env.example` 全部字段。
 3. 确保 `CRON_SECRET` 已设置（Cron 会使用 `Authorization: Bearer <CRON_SECRET>`）。
 4. `vercel.json` 已包含定时任务：
-   - `0 */2 * * *`：每 2 小时抓取一次
+   - `0 0 * * *`：UTC 00:00 抓取一次
    - `0 1 * * *`：UTC 01:00 发送摘要（即 Asia/Shanghai 09:00）
+5. 手动验证 Cron 路由时使用 GET：
+   `curl -H "Authorization: Bearer $CRON_SECRET" https://<domain>/api/jobs/fetch-videos`
 
 ## 常见问题
 

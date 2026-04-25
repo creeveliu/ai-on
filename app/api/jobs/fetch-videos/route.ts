@@ -13,6 +13,15 @@ function isAuthorized(req: NextRequest) {
   return auth === `Bearer ${getEnv().CRON_SECRET}`;
 }
 
+export async function GET(req: NextRequest) {
+  if (!isAuthorized(req)) {
+    return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+  }
+
+  const result = await runFetchVideosJob();
+  return NextResponse.json({ ok: true, ...result });
+}
+
 export async function POST(req: NextRequest) {
   const admin = await getAdminSession();
   const byCron = isAuthorized(req);

@@ -66,7 +66,7 @@ export async function fetchCreatorLatestVideos(channelId: string): Promise<YouTu
     .map((item: { contentDetails: { videoId: string } }) => item.contentDetails.videoId);
 
   // 3. Batch fetch video durations (up to 50 IDs per request)
-  let durationMap: Record<string, string> = {};
+  const durationMap: Record<string, string> = {};
   if (videoIds.length > 0) {
     try {
       const videosRes = await youtubeFetch("videos", {
