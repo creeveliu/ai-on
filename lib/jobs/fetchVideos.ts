@@ -1,6 +1,7 @@
 import { JobStatus, Platform } from "@prisma/client";
 
 import { db } from "@/lib/db";
+import { sendJobFailureEmail } from "@/lib/mail/jobAlert";
 import { getPlatformClient } from "@/lib/platform";
 
 type Creator = Awaited<ReturnType<typeof db.creator.findMany>>[0];
@@ -154,6 +155,14 @@ export async function runFetchVideosJob() {
       meta: { failures },
     },
   });
+
+  if (status !== "success") {
+    try {
+      await sendJobFailureEmail({ jobName: "fetch_videos", status, summary, failures });
+    } catch (error) {
+      console.error("[fetchVideos] failed to send job alert", error);
+    }
+  }
 
   return {
     status,

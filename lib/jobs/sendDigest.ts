@@ -3,6 +3,7 @@ import { JobStatus } from "@prisma/client";
 import { db } from "@/lib/db";
 import { getEnv } from "@/lib/env";
 import { sendDigestEmail } from "@/lib/mail/digest";
+import { sendJobFailureEmail } from "@/lib/mail/jobAlert";
 
 function digestDateKey(date: Date) {
   const year = date.getFullYear();
@@ -117,6 +118,14 @@ export async function runSendDigestJob() {
       meta: { failures },
     },
   });
+
+  if (status !== "success") {
+    try {
+      await sendJobFailureEmail({ jobName: "send_digest", status, summary, failures });
+    } catch (error) {
+      console.error("[sendDigest] failed to send job alert", error);
+    }
+  }
 
   return { status, summary, sent, failed, failures };
 }

@@ -4,6 +4,7 @@ import { getAdminSession } from "@/lib/auth";
 import { getEnv } from "@/lib/env";
 import { redirectTo } from "@/lib/http";
 import { runSendDigestJob } from "@/lib/jobs/sendDigest";
+import { sendJobFailureEmail } from "@/lib/mail/jobAlert";
 
 export const runtime = "nodejs";
 export const maxDuration = 180;
@@ -18,8 +19,23 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
-  const result = await runSendDigestJob();
-  return NextResponse.json({ ok: true, ...result });
+  try {
+    const result = await runSendDigestJob();
+    return NextResponse.json({ ok: true, ...result });
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : "Unknown error";
+    try {
+      await sendJobFailureEmail({
+        jobName: "send_digest",
+        status: "failed",
+        summary: "Unhandled cron error",
+        failures: [{ reason }],
+      });
+    } catch (alertError) {
+      console.error("[sendDigest] failed to send cron error alert", alertError);
+    }
+    return NextResponse.json({ ok: false, error: reason }, { status: 500 });
+  }
 }
 
 export async function POST(req: NextRequest) {
