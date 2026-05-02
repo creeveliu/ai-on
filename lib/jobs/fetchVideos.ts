@@ -99,47 +99,14 @@ export async function runFetchVideosJob() {
     }
     upsertedCount += result.upserted;
 
-    // 每个 creator 间隔 2 秒，降低 B站反爬风控概率
+    // Keep the cron under Vercel's serverless timeout while still spacing requests a little.
     if (creators.length > 1) {
-      await new Promise((resolve) => setTimeout(resolve, 2000));
+      await new Promise((resolve) => setTimeout(resolve, 500));
     }
   }
 
-  // 如果有失败，等 60 秒后重试
-  if (failures.length > 0 && failures.length < creators.length) {
-    console.log(`[fetchVideos] ${failures.length} creators failed, retrying in 60s...`);
-    await new Promise((resolve) => setTimeout(resolve, 60000));
-
-    const failedCreators = creators.filter((c) =>
-      failures.some((f) => f.platformId === c.platformId && f.platform === c.platform),
-    );
-
-    const retryFailures: Failure[] = [];
-    for (const creator of failedCreators) {
-      const result = await fetchCreator(creator);
-      if (result.success) {
-        // 重试成功，从失败列表移除
-        successCount += 1;
-        failedCount -= 1;
-        upsertedCount += result.upserted;
-        failures.splice(
-          failures.findIndex((f) => f.platformId === creator.platformId),
-          1,
-        );
-      } else {
-        // 重试仍然失败，更新原因
-        upsertedCount += result.upserted;
-        if (result.failure) {
-          const idx = failures.findIndex((f) => f.platformId === creator.platformId);
-          if (idx >= 0) failures[idx].reason = `Retry failed: ${result.failure.reason}`;
-          retryFailures.push(result.failure);
-        }
-      }
-    }
-
-    if (retryFailures.length > 0) {
-      console.log(`[fetchVideos] ${retryFailures.length} creators still failed after retry`);
-    }
+  if (failures.length > 0) {
+    console.log(`[fetchVideos] ${failures.length} creators failed; skipping retry in serverless job`);
   }
 
   const status: JobStatus =

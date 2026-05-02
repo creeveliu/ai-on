@@ -6,6 +6,7 @@ const envSchema = z.object({
   ADMIN_PASSWORD: z.string().min(6),
   AUTH_JWT_SECRET: z.string().min(16),
   BILI_SESSDATA: z.string().min(1),
+  BILI_COOKIE: z.string().min(1).optional(),
   BILI_PROXY: z.string().optional(),
   YOUTUBE_API_KEY: z.string().min(1).optional(),
   CRON_SECRET: z.string().min(1),

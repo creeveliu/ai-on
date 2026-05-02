@@ -23,6 +23,8 @@ const MIXIN_KEY_ENC_TAB = [
   40, 61, 26, 17, 0, 1, 60, 51, 30, 4, 22, 25, 54, 21, 56, 59, 6, 63, 57, 62,
   11, 36, 20, 34, 44, 52,
 ];
+const MIXIN_KEY_TTL_MS = 10 * 60 * 1000;
+let cachedMixinKey: { value: string; expiresAt: number } | null = null;
 
 function encWbiKey(key: string) {
   return MIXIN_KEY_ENC_TAB.map((i) => key[i]).join("").slice(0, 32);
@@ -51,11 +53,12 @@ function signParams(params: Record<string, string | number>, mixinKey: string) {
 }
 
 async function biliFetch(url: string) {
-  const { BILI_SESSDATA, BILI_PROXY } = getEnv();
+  const { BILI_COOKIE, BILI_SESSDATA, BILI_PROXY } = getEnv();
+  const cookie = BILI_COOKIE?.trim() || `SESSDATA=${BILI_SESSDATA}`;
 
   const createInit = (useProxy: boolean): RequestInit & { dispatcher?: ProxyAgent } => ({
     headers: {
-      Cookie: `SESSDATA=${BILI_SESSDATA}`,
+      Cookie: cookie,
       Referer: "https://www.bilibili.com",
       Accept: "application/json, text/plain, */*",
       "User-Agent":
@@ -87,6 +90,10 @@ async function biliFetch(url: string) {
 }
 
 async function getMixinKey() {
+  if (cachedMixinKey && cachedMixinKey.expiresAt > Date.now()) {
+    return cachedMixinKey.value;
+  }
+
   const nav = await biliFetch("https://api.bilibili.com/x/web-interface/nav");
   const imgUrl = String(nav?.data?.wbi_img?.img_url ?? "");
   const subUrl = String(nav?.data?.wbi_img?.sub_url ?? "");
@@ -97,7 +104,9 @@ async function getMixinKey() {
 
   const imgKey = imgUrl.split("/").pop()?.split(".")[0] ?? "";
   const subKey = subUrl.split("/").pop()?.split(".")[0] ?? "";
-  return encWbiKey(imgKey + subKey);
+  const value = encWbiKey(imgKey + subKey);
+  cachedMixinKey = { value, expiresAt: Date.now() + MIXIN_KEY_TTL_MS };
+  return value;
 }
 
 export async function fetchCreatorLatestVideos(mid: string): Promise<BiliVideo[]> {
@@ -114,39 +123,28 @@ export async function fetchCreatorLatestVideos(mid: string): Promise<BiliVideo[]
 
   const endpoint = `https://api.bilibili.com/x/space/wbi/arc/search?${params.toString()}`;
 
-  let attempts = 0;
-  while (attempts < 3) {
-    attempts += 1;
-    const json = await biliFetch(endpoint);
-    const code = Number(json?.code ?? -1);
+  const json = await biliFetch(endpoint);
+  const code = Number(json?.code ?? -1);
 
-    if (code === 0) {
-      const list = (json?.data?.list?.vlist ?? []) as Array<{
-        bvid?: string;
-        title?: string;
-        created?: number;
-      }>;
+  if (code === 0) {
+    const list = (json?.data?.list?.vlist ?? []) as Array<{
+      bvid?: string;
+      title?: string;
+      created?: number;
+    }>;
 
-      return list
-        .filter((item) => item.bvid && item.title && item.created)
-        .map((item) => ({
-          videoId: item.bvid!,
-          title: item.title!,
-          url: `https://www.bilibili.com/video/${item.bvid}`,
-          publishedAt: new Date((item.created ?? 0) * 1000),
-          raw: item,
-        }));
-    }
-
-    if ([-352, -412, -401].includes(code) && attempts < 3) {
-      await new Promise((resolve) => setTimeout(resolve, attempts * 1500));
-      continue;
-    }
-
-    throw new Error(`Bilibili fetch failed (code=${code}, message=${json?.message ?? "unknown"})`);
+    return list
+      .filter((item) => item.bvid && item.title && item.created)
+      .map((item) => ({
+        videoId: item.bvid!,
+        title: item.title!,
+        url: `https://www.bilibili.com/video/${item.bvid}`,
+        publishedAt: new Date((item.created ?? 0) * 1000),
+        raw: item,
+      }));
   }
 
-  throw new Error("Bilibili fetch exhausted retries");
+  throw new Error(`Bilibili fetch failed (code=${code}, message=${json?.message ?? "unknown"})`);
 }
 
 export async function fetchCreatorDisplayName(mid: string): Promise<string | null> {

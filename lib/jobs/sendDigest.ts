@@ -12,6 +12,35 @@ function digestDateKey(date: Date) {
   return `${year}-${month}-${day}`;
 }
 
+async function alertIfFetchVideosStale(now: Date) {
+  const latestFetch = await db.jobLog.findFirst({
+    where: { jobName: "fetch_videos" },
+    orderBy: { createdAt: "desc" },
+  });
+
+  const staleAfterMs = 26 * 60 * 60 * 1000;
+  const isStale = !latestFetch || now.getTime() - latestFetch.createdAt.getTime() > staleAfterMs;
+
+  if (!isStale) {
+    return;
+  }
+
+  const summary = latestFetch
+    ? `Latest fetch_videos log is stale: ${latestFetch.createdAt.toISOString()} (${latestFetch.summary})`
+    : "No fetch_videos job log found";
+
+  try {
+    await sendJobFailureEmail({
+      jobName: "fetch_videos",
+      status: "failed",
+      summary,
+      failures: [{ reason: "Expected daily fetch_videos cron did not complete recently" }],
+    });
+  } catch (error) {
+    console.error("[sendDigest] failed to send stale fetch alert", error);
+  }
+}
+
 export async function runSendDigestJob() {
   const env = getEnv();
   if (!env.RESEND_API_KEY || !env.MAIL_FROM) {
@@ -27,6 +56,8 @@ export async function runSendDigestJob() {
   }
 
   const now = new Date();
+  await alertIfFetchVideosStale(now);
+
   const dateKey = digestDateKey(now);
   const since = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
