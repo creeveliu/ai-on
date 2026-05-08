@@ -24,7 +24,9 @@ const MIXIN_KEY_ENC_TAB = [
   11, 36, 20, 34, 44, 52,
 ];
 const MIXIN_KEY_TTL_MS = 10 * 60 * 1000;
+const BILI_TICKET_REFRESH_WINDOW_MS = 12 * 60 * 60 * 1000;
 let cachedMixinKey: { value: string; expiresAt: number } | null = null;
+let cachedCookie: { value: string; expiresAt: number } | null = null;
 
 function encWbiKey(key: string) {
   return MIXIN_KEY_ENC_TAB.map((i) => key[i]).join("").slice(0, 32);
@@ -52,9 +54,89 @@ function signParams(params: Record<string, string | number>, mixinKey: string) {
   return searchParams;
 }
 
+function getCookieValue(cookie: string, name: string) {
+  return cookie.match(new RegExp(`(?:^|;\\s*)${name}=([^;]+)`))?.[1] ?? "";
+}
+
+function upsertCookieValue(cookie: string, name: string, value: string) {
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const pattern = new RegExp(`(^|;\\s*)${escaped}=[^;]*`);
+
+  if (pattern.test(cookie)) {
+    return cookie.replace(pattern, `$1${name}=${value}`);
+  }
+
+  return `${cookie}; ${name}=${value}`;
+}
+
+async function generateBiliTicket(cookie: string) {
+  const ts = Math.floor(Date.now() / 1000);
+  const hexsign = crypto.createHmac("sha256", "XgwSnGZ1p").update(`ts${ts}`).digest("hex");
+  const csrf = getCookieValue(cookie, "bili_jct");
+  const params = new URLSearchParams({
+    key_id: "ec02",
+    hexsign,
+    "context[ts]": String(ts),
+    csrf,
+  });
+
+  const res = await fetch(
+    `https://api.bilibili.com/bapis/bilibili.api.ticket.v1.Ticket/GenWebTicket?${params.toString()}`,
+    {
+      method: "POST",
+      headers: {
+        Cookie: cookie,
+        Referer: "https://www.bilibili.com/",
+        Accept: "application/json, text/plain, */*",
+        "User-Agent":
+          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+      },
+    },
+  );
+  const json = await res.json();
+
+  if (Number(json?.code ?? -1) !== 0 || !json?.data?.ticket) {
+    throw new Error(`Bilibili ticket refresh failed (code=${json?.code ?? "unknown"}, message=${json?.message ?? "unknown"})`);
+  }
+
+  return {
+    ticket: String(json.data.ticket),
+    expiresAt: (Number(json.data.created_at) + Number(json.data.ttl)) * 1000,
+  };
+}
+
+async function getBiliCookie() {
+  const { BILI_COOKIE, BILI_SESSDATA } = getEnv();
+  const baseCookie = BILI_COOKIE?.trim() || `SESSDATA=${BILI_SESSDATA}`;
+
+  if (cachedCookie && cachedCookie.expiresAt - Date.now() > BILI_TICKET_REFRESH_WINDOW_MS) {
+    return cachedCookie.value;
+  }
+
+  const ticketExpires = Number(getCookieValue(baseCookie, "bili_ticket_expires")) * 1000;
+  if (ticketExpires && ticketExpires - Date.now() > BILI_TICKET_REFRESH_WINDOW_MS) {
+    cachedCookie = { value: baseCookie, expiresAt: ticketExpires };
+    return baseCookie;
+  }
+
+  try {
+    const ticket = await generateBiliTicket(baseCookie);
+    const withTicket = upsertCookieValue(
+      upsertCookieValue(baseCookie, "bili_ticket", ticket.ticket),
+      "bili_ticket_expires",
+      String(Math.floor(ticket.expiresAt / 1000)),
+    );
+    cachedCookie = { value: withTicket, expiresAt: ticket.expiresAt };
+    return withTicket;
+  } catch (error) {
+    console.error("[bilibili] failed to refresh bili_ticket", error);
+    return baseCookie;
+  }
+}
+
 async function biliFetch(url: string) {
-  const { BILI_COOKIE, BILI_SESSDATA, BILI_PROXY } = getEnv();
-  const cookie = BILI_COOKIE?.trim() || `SESSDATA=${BILI_SESSDATA}`;
+  const { BILI_PROXY } = getEnv();
+  const cookie = await getBiliCookie();
 
   const createInit = (useProxy: boolean): RequestInit & { dispatcher?: ProxyAgent } => ({
     headers: {
