@@ -32,8 +32,8 @@
 ## Cron / Serverless Timeout
 - Vercel Serverless 函数默认超时：Hobby 10s / Pro 30s。超时后进程被 kill，无报错日志，表现为 cron 静默不执行。
 - 所有 cron 路由必须显式设置 `export const maxDuration`，根据实际耗时决定（含 `setTimeout` 延迟也要算进去）。
-- 调试 cron：`curl -X POST -H "Authorization: Bearer $CRON_SECRET" <url>`，若超 30s 必挂，优先排查 `maxDuration`。
-- 已发生：`fetch-videos` 因缺少 `maxDuration`，2s 间隔 + 60s 重试导致全量静默失败。
+- 调试 cron：`curl -H "Authorization: Bearer $CRON_SECRET" <url>`，若超时优先排查 `maxDuration` 与 job 内部等待。
+- 已发生：`fetch-videos` 因 2s 间隔 + 60s 重试导致全量静默失败；Serverless 内重试等待必须保持短耗时。
 
 ## Docs
 - Keep `README.md` accurate for:
