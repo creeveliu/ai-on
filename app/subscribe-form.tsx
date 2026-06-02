@@ -7,7 +7,7 @@ export function SubscribeForm() {
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setMessage("暂不支持，敬请期待");
+    setMessage("作者买不起域名，此功能遥遥无期");
   }
 
   return (
