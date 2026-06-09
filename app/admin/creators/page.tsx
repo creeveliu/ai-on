@@ -48,10 +48,10 @@ export default async function CreatorsPage() {
       <section className="ui-panel">
         <h2>添加主播</h2>
         <p className="ui-muted" style={{ marginBottom: 10 }}>
-          粘贴 Bilibili 空间链接或 YouTube 频道链接，系统会自动识别平台、名称，默认启用并立即抓取。
+          粘贴 YouTube 频道链接，系统会自动识别名称，默认启用并立即抓取。
         </p>
         <form action="/api/admin/creators" method="post" className="ui-inline-form">
-          <input className="ui-input" name="link" placeholder="https://space.bilibili.com/xxxxxx 或 https://youtube.com/@handle" required />
+          <input className="ui-input" name="link" placeholder="https://youtube.com/@handle" required />
           <button className="ui-button" type="submit">
             保存
           </button>

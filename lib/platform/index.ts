@@ -2,7 +2,7 @@ import { Platform } from "@prisma/client";
 
 import { parseMid, fetchCreatorLatestVideos, fetchCreatorProfile, fetchCreatorDisplayName } from "@/lib/bilibili";
 import { parseYouTubeChannelId, fetchCreatorLatestVideos as ytFetchVideos, fetchCreatorProfile as ytFetchProfile, fetchCreatorDisplayName as ytFetchDisplayName, resolveChannelId } from "@/lib/youtube";
-import type { PlatformClient, PlatformVideo, PlatformCreatorProfile } from "./types";
+import type { PlatformClient } from "./types";
 
 const clients: Record<Platform, PlatformClient> = {
   bilibili: {

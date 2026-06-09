@@ -107,7 +107,10 @@ async function generateBiliTicket(cookie: string) {
 
 async function getBiliCookie() {
   const { BILI_COOKIE, BILI_SESSDATA } = getEnv();
-  const baseCookie = BILI_COOKIE?.trim() || `SESSDATA=${BILI_SESSDATA}`;
+  const baseCookie = BILI_COOKIE?.trim() || (BILI_SESSDATA ? `SESSDATA=${BILI_SESSDATA}` : "");
+  if (!baseCookie) {
+    throw new Error("Bilibili credentials are not configured");
+  }
 
   if (cachedCookie && cachedCookie.expiresAt - Date.now() > BILI_TICKET_REFRESH_WINDOW_MS) {
     return cachedCookie.value;

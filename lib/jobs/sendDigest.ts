@@ -62,7 +62,7 @@ export async function runSendDigestJob() {
   const since = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
   const videos = await db.video.findMany({
-    where: { publishedAt: { gte: since } },
+    where: { publishedAt: { gte: since }, creator: { enabled: true } },
     include: { creator: true },
     orderBy: { publishedAt: "desc" },
   });

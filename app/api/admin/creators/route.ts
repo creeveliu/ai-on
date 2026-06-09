@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
 
   // Detect platform from URL
   const platform = detectPlatformFromUrl(link);
-  if (!platform) {
+  if (!platform || platform !== "youtube") {
     return redirectTo(req, "/admin/creators?error=unknown_platform");
   }
 

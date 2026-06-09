@@ -112,7 +112,10 @@ export default async function Home({
     });
 
     videos = await db.video.findMany({
-      where: creator ? { creatorId: creator } : undefined,
+      where: {
+        ...(creator ? { creatorId: creator } : {}),
+        creator: { enabled: true },
+      },
       include: { creator: { select: { name: true, avatarUrl: true } } },
       orderBy: { publishedAt: "desc" },
       take: 100,

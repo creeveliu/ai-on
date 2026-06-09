@@ -1,6 +1,6 @@
 # AI ON
 
-B 站创作者聚合站（MVP）：
+YouTube 创作者聚合站（MVP）：
 登录后台 -> 添加主播（链接）-> 自动抓取入库 -> 首页 Threads 风格展示 -> 邮件订阅 -> 每日摘要发送。
 
 ## 本地启动
@@ -43,7 +43,7 @@ npm run dev
 
 ## 后台使用
 
-- 添加主播：只贴 B 站空间链接，默认启用并立即触发抓取。
+- 添加主播：只贴 YouTube 频道链接，默认启用并立即触发抓取。
 - 改名：在主播列表里直接编辑并保存。
 - 任务：`/admin/jobs` 可手动触发抓取与日报发送，并查看日志。
 
@@ -61,12 +61,12 @@ npm run dev
 ## 常见问题
 
 - 报 `Unknown field avatarUrl`：执行 `npm run prisma:generate`，并重启 `npm run dev`。
-- 抓取失败且日志出现 `Unexpected token '<'`：通常是风控页/代理拦截，已内置直连回退重试。
+- YouTube 抓取失败：检查 `YOUTUBE_API_KEY` 是否有效、配额是否足够。
 - 没配发信变量时：摘要发送任务会跳过发信并记录日志，不会影响其他功能。
 
 ## 目录
 
 - `app/`：页面与 API 路由
-- `lib/`：B 站抓取、任务调度、鉴权、邮件等逻辑
+- `lib/`：平台抓取、任务调度、鉴权、邮件等逻辑
 - `prisma/`：Schema、迁移、seed
 - `vercel.json`：Cron 配置
